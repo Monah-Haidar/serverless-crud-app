@@ -1,16 +1,25 @@
+
 # "org" ensures this Service is used with the correct Serverless Framework Access Key.
 org: monah
 # "service" is the name of this project. This will also be added to your AWS resource names.
 service: my-serverless-project
 
+useDotenv: true
+
 provider:
   name: aws
   runtime: python3.12
   region: us-east-1
+  environment:
+    DYNAMODB_TABLE: ${env:DYNAMODB_TABLE}
   iamRoleStatements:
     - Effect: Allow
       Action:
-        - dynamodb:*
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+        - dynamodb:Scan
       Resource:
         - arn:aws:dynamodb:us-east-1:448049791700:table/http-crud-tutorial-items
 
@@ -59,6 +68,3 @@ resources:
         KeySchema:
           - AttributeName: item_id
             KeyType: HASH
-        # ProvisionedThroughput:
-        #   ReadCapacityUnits: 1
-        #   WriteCapacityUnits: 1

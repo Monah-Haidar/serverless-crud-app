@@ -1,137 +1,172 @@
 import json
-import uuid
-import boto3
+from modules.item.services import (
+    add_item_service,
+    delete_item_service,
+    list_item_service,
+    list_items_service,
+    update_item_service,
+)
+from modules.shared.services.logger import get_logger
+from modules.shared.services.dynamodb import get_dynamodb_table
 
+logger = get_logger(__name__)
 
-dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table('http-crud-tutorial-items')
+table = get_dynamodb_table()
+
 
 def get_items(event, context):
     try:
-        response = table.scan()
-        
-        items = response.get('Items', [])
+        items = list_items_service()
 
-        body = {
-            "message": "Go Serverless v4.0! Your function executed successfully!",
-            "data": items,
+        return {
+            "statusCode": 200,
+            "body": json.dumps(
+                {
+                    "message": "Items retrieved successfully!",
+                    "data": items,
+                },
+                default=str,
+            ),
         }
 
-        response = {"statusCode": 200, "body": json.dumps(body, default=str)}
-
-        return response
-
     except Exception as e:
-        return {"statusCode": 500, "body": json.dumps({"error": f"Error fetching items: {str(e)}"})}
-    
-    
+        logger.error(f"Error fetching items: {str(e)}")
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"message": "Error fetching items"}),
+        }
 
 
 def add_item(event, context):
     try:
-        
-        data = json.loads(event['body'])
-        item_id = str(uuid.uuid4())
-        item = {
-            'item_id': item_id,
-            'name': data.get('name'),
-            'price': data.get('price')
-        }
-        try:    
-            table.put_item(Item=item)
-        except Exception as e:
-            return {"statusCode": 500, "body": json.dumps({"error": f"Error inserting item into db:{str(e)}"})}
-        
-        body = {
-            "message": "Item added successfully!",
-            "data": {
-                "item_id": item_id,
-                "name": item
-            }
+
+        data = json.loads(event["body"])
+
+        item = add_item_service(data)
+
+        return {
+            "statusCode": 200,
+            "body": json.dumps(
+                {
+                    "message": "Item added successfully!",
+                    "name": item,
+                },
+                default=str,
+            ),
         }
 
-        response = {"statusCode": 200, "body": json.dumps(body)}
-
-        return response
     except Exception as e:
-        return {"statusCode": 500, "body": json.dumps({"error": f"Error adding item: {str(e)}"})}
+        logger.error(f"Error adding item: {str(e)}")
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"message": "Error adding item"}),
+        }
 
 
 def get_item(event, context):
     try:
-        item_id = event['pathParameters']['item_id']
-        response = table.get_item(Key={'item_id': item_id})
-        item = response.get('Item')
+        item_id = event["pathParameters"]["item_id"]
+        if not item_id:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"message": "Item ID is required"}),
+            }
+
+        item = list_item_service(item_id)
+        logger.info(f"Item retrieved successfully: {item}")
         if not item:
-            return {"statusCode": 404, "body": json.dumps({"error": "Item not found"})}
-        
-        body = {
-            "message": "Item retrieved successfully!",
-            "data": item
+            return {
+                "statusCode": 404,
+                "body": json.dumps({"message": "Item not found"}),
+            }
+
+        return {
+            "statusCode": 200,
+            "body": json.dumps(
+                {"message": "Item retrieved successfully!", "data": item}, default=str
+            ),
         }
 
-        response = {"statusCode": 200, "body": json.dumps(body, default=str)}
-
-        return response
     except Exception as e:
-        return {"statusCode": 500, "body": json.dumps({"error": f"Error retrieving item: {str(e)}"})}
+        logger.error(f"Error retrieving item: {str(e)}")
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"message": "Error retrieving item"}),
+        }
 
 
 def update_item(event, context):
     try:
-        data = json.loads(event['body'])
-        item_id = event['pathParameters']['item_id']
-        
-        existing = table.get_item(Key={'item_id': item_id}).get('Item')
-        if not existing:
-            return {"statusCode": 404, "body": json.dumps({"message": "Item not found"})}
-        
-        response = table.update_item(
-            Key={'item_id': item_id},
-            UpdateExpression="set #name = :name, #price = :price",
-            ExpressionAttributeNames={
-                "#name": "name",
-                "#price": "price"
-            },
-            ExpressionAttributeValues={
-                ":name": data.get('name'),
-                ":price": data.get('price')
-            },
-            ConditionExpression="attribute_exists(item_id)",
-            ReturnValues="UPDATED_NEW"
-        )
+        item_id = event["pathParameters"]["item_id"]
+        data = json.loads(event["body"])
+        if not item_id:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"message": "Item ID is required"}),
+            }
+        if not data:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"message": "Data is required for update"}),
+            }
 
-        updated_item = response.get('Attributes', {})
         
-        body = {
-            "message": "Item updated successfully!",
-            "data": updated_item
+        existing_item = list_item_service(item_id)
+        if not existing_item:
+            return {
+                "statusCode": 404,
+                "body": json.dumps({"message": "Item not found"}),
+            }
+
+        updated_item = update_item_service(item_id, data)
+        
+        return {
+            "statusCode": 200,
+            "body": json.dumps(
+                {"message": "Item updated successfully!", "data": updated_item},
+                default=str
+            ),
         }
 
-        response = {"statusCode": 200, "body": json.dumps(body, default=str)}
-
-        return response
     except Exception as e:
-        return {"statusCode": 500, "body": json.dumps({"error": f"Error updating item: {str(e)}"})}
+        logger.error(f"Error updating item: {str(e)}")
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"message": "Error updating item"}),
+        }
 
 
 def delete_item(event, context):
     try:
+        item_id = event["pathParameters"]["item_id"]
+        if not item_id:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"message": "Item ID is required"}),
+            }
         
-        item_id = event['pathParameters']['item_id']
-        
-        response = table.delete_item(
-            Key={'item_id': item_id},
-            ConditionExpression="attribute_exists(item_id)" 
-        )
+        existing_item = list_item_service(item_id)
+        if not existing_item:
+            return {
+                "statusCode": 404,
+                "body": json.dumps({"message": "Item not found"}),
+            }
 
-        
-        body = {
-        "message": "Item deleted successfully!",
+        response = delete_item_service(item_id)
+
+        return {
+            "statusCode": 200,
+            "body": json.dumps(
+                {
+                    "message": "Item deleted successfully!",
+                },
+                default=str
+            ),
         }
 
-        response = {"statusCode": 200, "body": json.dumps(body)}
-
-        return response
     except Exception as e:
-        return {"statusCode": 500, "body": json.dumps({"error": f"Error deleting item: {str(e)}"})}
+        logger.error(f"Error deleting item: {str(e)}")
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"message": "Error deleting item"}),
+        }
