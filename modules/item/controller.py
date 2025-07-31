@@ -1,22 +1,18 @@
 import json
-from modules.item.services import (
-    add_item_service,
-    delete_item_service,
-    list_item_service,
-    list_items_service,
-    update_item_service,
-)
+
 from modules.shared.services.logger import get_logger
 from modules.shared.services.dynamodb import get_dynamodb_table
 
+from modules.item.services import ItemsService
+
 logger = get_logger(__name__)
 
-table = get_dynamodb_table()
+items_service = ItemsService()
 
 
 def get_items(event, context):
     try:
-        items = list_items_service()
+        items = items_service.list_items()
 
         return {
             "statusCode": 200,
@@ -42,7 +38,7 @@ def add_item(event, context):
 
         data = json.loads(event["body"])
 
-        item = add_item_service(data)
+        item = items_service.add_item(data)
 
         return {
             "statusCode": 200,
@@ -72,7 +68,7 @@ def get_item(event, context):
                 "body": json.dumps({"message": "Item ID is required"}),
             }
 
-        item = list_item_service(item_id)
+        item = items_service.list_item(item_id)
         logger.info(f"Item retrieved successfully: {item}")
         if not item:
             return {
@@ -110,15 +106,15 @@ def update_item(event, context):
                 "body": json.dumps({"message": "Data is required for update"}),
             }
 
-        
-        existing_item = list_item_service(item_id)
+
+        existing_item = items_service.list_item(item_id)
         if not existing_item:
             return {
                 "statusCode": 404,
                 "body": json.dumps({"message": "Item not found"}),
             }
 
-        updated_item = update_item_service(item_id, data)
+        updated_item = items_service.update_item(item_id, data)
         
         return {
             "statusCode": 200,
@@ -145,14 +141,14 @@ def delete_item(event, context):
                 "body": json.dumps({"message": "Item ID is required"}),
             }
         
-        existing_item = list_item_service(item_id)
+        existing_item = items_service.list_item(item_id)
         if not existing_item:
             return {
                 "statusCode": 404,
                 "body": json.dumps({"message": "Item not found"}),
             }
 
-        response = delete_item_service(item_id)
+        response = items_service.delete_item(item_id)
 
         return {
             "statusCode": 200,
