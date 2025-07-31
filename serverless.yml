@@ -23,37 +23,10 @@ provider:
       Resource:
         - arn:aws:dynamodb:us-east-1:448049791700:table/http-crud-tutorial-items
 
-functions:
-  get_items:
-    handler: modules/item/controller.get_items
-    events:
-      - httpApi:
-          path: /items
-          method: get
-  get_item:
-    handler: modules/item/controller.get_item
-    events:
-      - httpApi:
-          path: /items/{item_id}
-          method: get
-  add_item:
-    handler: modules/item/controller.add_item
-    events:
-      - httpApi:
-          path: /items
-          method: post
-  update_item:
-    handler: modules/item/controller.update_item
-    events:
-      - httpApi:
-          path: /items/{item_id}
-          method: put
-  delete_item:
-    handler: modules/item/controller.delete_item
-    events:
-      - httpApi:
-          path: /items/{item_id}
-          method: delete
+package:
+  individually: true
+
+functions: ${file(modules/item/routes.yml)}
 
 resources:
   Resources:
